@@ -19,6 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+from .comment import Comment
 
 
 class Bus(object):
@@ -42,7 +43,17 @@ class Bus(object):
     @property
     def comment(self):
         """The bus comment, or ``None`` if unavailable."""
+        if self._comment is not None and not isinstance(self._comment, Comment):
+            self._comment = Comment(self._comment)
+
         return self._comment
+
+    @comment.setter
+    def comment(self, value):
+        if value is not None and not isinstance(value, (str, Comment)):
+            value = str(value)
+
+        self._comment = value
 
     @property
     def baudrate(self):

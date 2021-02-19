@@ -36,6 +36,7 @@ from .frame_id import J1939FrameId, GMParameterId, FrameId, GMParameterIdExtende
 from . import attribute
 from . import attribute_definition
 from . import can_data
+from .comment import MessageComment
 
 
 class Message(attribute.AttributeMixin):
@@ -78,8 +79,9 @@ class Message(attribute.AttributeMixin):
         if isinstance(comment, str):
             # use the first comment in the dictionary as "The" comment
             self._comments = {None: comment}
+        elif comment is None:
+            self._comments = {}
         else:
-            # assume that we have either no comment at all or a
             # multi-lingual dictionary
             self._comments = comment
 
@@ -236,32 +238,82 @@ class Message(attribute.AttributeMixin):
         self._signal_groups = value
 
     @property
+    def comments(self):
+        """The dictionary with the descriptions of the signal in multiple languages. ``None`` if unavailable."""
+
+        for key, val in list(self._comments.items())[:]:
+            if val is not None:
+                if isinstance(val, bytes):
+                    val = val.decode('utf-8')
+                if not isinstance(val, MessageComment):
+                    val = MessageComment(val)
+                    val.message = self
+
+                self._comments[key] = val
+
+        return self._comments
+
+    @comments.setter
+    def comments(self, value):
+        if value is None:
+            value = {}
+
+        if not isinstance(value, dict):
+            raise TypeError('passed value is not a dictionary `dict`')
+
+        for key, val in list(value.items())[:]:
+            if val is not None:
+                if isinstance(val, bytes):
+                    val = val.decode('utf-8')
+                if not isinstance(val, (str, MessageComment)):
+                    val = str(val)
+
+                value[key] = val
+
+        self._comments = value
+
+    @property
     def comment(self):
         """
-        The message comment, or ``None`` if unavailable.
+        The signal comment, or ``None`` if unavailable.
 
         Note that we implicitly try to return the comment's language
         to be English comment if multiple languages were specified.
         """
-        if self._comments is None:
-            return None
-        elif self._comments.get(None) is not None:
-            return self._comments.get(None)
+        comment = self._comments.get(None, None)
 
-        return self._comments.get('EN', None)
+        if comment is None:
+            comment = self._comments.get('EN', None)
 
-    @property
-    def comments(self):
-        """The dictionary with the descriptions of the message in multiple languages. ``None`` if unavailable."""
-        return self._comments
+            if comment is not None:
+                if isinstance(comment, bytes):
+                    comment = comment.decode('utf-8')
+
+                if not isinstance(comment, MessageComment):
+                    comment = MessageComment(comment)
+                    comment.message = self
+                    self._comments['EN'] = comment
+
+        else:
+            if isinstance(comment, bytes):
+                comment = comment.decode('utf-8')
+
+            if not isinstance(comment, MessageComment):
+                comment = MessageComment(comment)
+                comment.message = self
+                self._comments[None] = comment
+
+        return comment
 
     @comment.setter
     def comment(self, value):
-        self._comments = {None: value}
+        if isinstance(value, bytes):
+            value = value.decode('utf-8')
 
-    @comments.setter
-    def comments(self, value):
-        self._comments = value
+        if value is not None and not isinstance(value, (str, MessageComment)):
+            value = str(value)
+
+        self._comments = {None: value}
 
     @property
     def senders(self):
@@ -800,3 +852,29 @@ class Message(attribute.AttributeMixin):
             choices = {v: k for k, v in definition.choices.items()}
 
             self.dbc.attributes['GenMsgSendType'] = attribute.Attribute(choices[value], definition)
+
+    @property
+    def dbc_frame_id(self):
+        frame_id = int(self.frame_id)
+
+        if self.is_extended_frame:
+            frame_id |= 0x80000000
+
+        return frame_id
+
+    def __str__(self):
+        res = [
+            'BO_ {frame_id} {name}: {length} {senders}'.format(
+                frame_id=int(self.frame_id),
+                name=self.name,
+                length=self.length,
+                senders=self.senders[0].name if self.senders else 'Vector__XXX'
+            )
+        ]
+
+        res += [
+            str(signal) for signal in self.signals[::-1]
+        ]
+
+        return '\n'.join(res)
+

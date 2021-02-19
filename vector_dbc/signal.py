@@ -24,6 +24,7 @@ from . import attribute
 from . import attribute_definition
 
 from .errors import EncodeError
+from .comment import SignalComment
 
 
 class Decimal(object):
@@ -144,8 +145,9 @@ class Signal(attribute.AttributeMixin):
         if isinstance(comment, str):
             # use the first comment in the dictionary as "The" comment
             self._comments = {None: comment}
+        elif comment is None:
+            self._comments = {}
         else:
-            # assume that we have either no comment at all or a
             # multi-lingual dictionary
             self._comments = comment
 
@@ -296,6 +298,41 @@ class Signal(attribute.AttributeMixin):
         self._dbc = value
 
     @property
+    def comments(self):
+        """The dictionary with the descriptions of the signal in multiple languages. ``None`` if unavailable."""
+
+        for key, val in list(self._comments.items())[:]:
+            if val is not None:
+                if isinstance(val, bytes):
+                    val = val.decode('utf-8')
+                if not isinstance(val, SignalComment):
+                    val = SignalComment(val)
+                    val.signal = self
+
+                self._comments[key] = val
+
+        return self._comments
+
+    @comments.setter
+    def comments(self, value):
+        if value is None:
+            value = {}
+
+        if not isinstance(value, dict):
+            raise TypeError('passed value is not a dictionary `dict`')
+
+        for key, val in list(value.items())[:]:
+            if val is not None:
+                if isinstance(val, bytes):
+                    val = val.decode('utf-8')
+                if not isinstance(val, (str, SignalComment)):
+                    val = str(val)
+
+                value[key] = val
+
+        self._comments = value
+
+    @property
     def comment(self):
         """
         The signal comment, or ``None`` if unavailable.
@@ -303,25 +340,40 @@ class Signal(attribute.AttributeMixin):
         Note that we implicitly try to return the comment's language
         to be English comment if multiple languages were specified.
         """
-        if self._comments is None:
-            return None
-        elif self._comments.get(None) is not None:
-            return self._comments.get(None)
+        comment = self._comments.get(None, None)
 
-        return self._comments.get('EN', None)
+        if comment is None:
+            comment = self._comments.get('EN', None)
 
-    @property
-    def comments(self):
-        """The dictionary with the descriptions of the signal in multiple languages. ``None`` if unavailable."""
-        return self._comments
+            if comment is not None:
+                if isinstance(comment, bytes):
+                    comment = comment.decode('utf-8')
+
+                if not isinstance(comment, SignalComment):
+                    comment = SignalComment(comment)
+                    comment.signal = self
+                    self._comments['EN'] = comment
+
+        else:
+            if isinstance(comment, bytes):
+                comment = comment.decode('utf-8')
+
+            if not isinstance(comment, SignalComment):
+                comment = SignalComment(comment)
+                comment.signal = self
+                self._comments[None] = comment
+
+        return comment
 
     @comment.setter
     def comment(self, value):
-        self._comments = {None: value}
+        if isinstance(value, bytes):
+            value = value.decode('utf-8')
 
-    @comments.setter
-    def comments(self, value):
-        self._comments = value
+        if value is not None and not isinstance(value, (str, SignalComment)):
+            value = str(value)
+
+        self._comments = {None: value}
 
     @property
     def receivers(self):
@@ -762,3 +814,39 @@ class Signal(attribute.AttributeMixin):
             choices = {v: k for k, v in definition.choices.items()}
 
             self.dbc.attributes['GenSigEnvVarType'] = attribute.Attribute(choices[value], definition)
+
+    def __str__(self):
+        if self.is_multiplexer:
+            mux = ' M'
+        elif self.multiplexer_ids is not None:
+            mux = ' m{}'.format(self.multiplexer_ids[0])
+        else:
+            mux = ''
+
+        if self.receivers:
+            receivers = ' ' + ','.join(node.name for node in self.receivers)
+        else:
+            receivers = 'Vector__XXX'
+
+        fmt = (
+            ' SG_ {name}{mux} : {start}|{length}@{byte_order}{sign}'
+            ' ({scale},{offset})'
+            ' [{minimum}|{maximum}] "{unit}" {receivers}'
+        )
+
+        res = fmt.format(
+                name=self.name,
+                mux=mux,
+                start=self.start,
+                length=self.length,
+                receivers=receivers,
+                byte_order=(0 if self.byte_order == 'big_endian' else 1),
+                sign='-' if self.is_signed else '+',
+                scale=self.scale,
+                offset=self.offset,
+                minimum=0 if self.minimum is None else self.minimum,
+                maximum=0 if self.maximum is None else self.maximum,
+                unit='' if self.unit is None else self.unit
+        )
+        return res
+

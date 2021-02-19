@@ -54,66 +54,66 @@ from .environment_variable import EnvironmentVariable
 
 def num(number_as_string):
     """Convert given string to an integer or a float."""
-
     try:
         return int(number_as_string)
     except ValueError:
-        return float(number_as_string)
+        return Decimal(number_as_string)
 
 
 DBC_FMT = """\
-VERSION "{version}"\r
-\r
-\r
-NS_ : \r
-    NS_DESC_\r
-    CM_\r
-    BA_DEF_\r'
-    BA_\r
-    VAL_\r
-    CAT_DEF_\r
-    CAT_\r
-    FILTER\r
-    BA_DEF_DEF_\r
-    EV_DATA_\r
-    ENVVAR_DATA_\r
-    SGTYPE_\r
-    SGTYPE_VAL_\r
-    BA_DEF_SGTYPE_\r
-    BA_SGTYPE_\r
-    SIG_TYPE_REF_\r
-    VAL_TABLE_\r
-    SIG_GROUP_\r
-    SIG_VALTYPE_\r
-    SIGTYPE_VALTYPE_\r
-    BO_TX_BU_\r
-    BA_DEF_REL_\r
-    BA_REL_\r
-    BA_DEF_DEF_REL_\r
-    BU_SG_REL_\r
-    BU_EV_REL_\r
-    BU_BO_REL_\r
-    SG_MUL_VAL_\r
-\r
-BS_:\r
-\r
-BU_: {bu}\r
+VERSION "{version}"
+
+
+NS_ :
+    NS_DESC_
+    CM_
+    BA_DEF_
+    BA_
+    VAL_
+    CAT_DEF_
+    CAT_
+    FILTER
+    BA_DEF_DEF_
+    EV_DATA_
+    ENVVAR_DATA_
+    SGTYPE_
+    SGTYPE_VAL_
+    BA_DEF_SGTYPE_
+    BA_SGTYPE_
+    SIG_TYPE_REF_
+    VAL_TABLE_
+    SIG_GROUP_
+    SIG_VALTYPE_
+    SIGTYPE_VALTYPE_
+    BO_TX_BU_
+    BA_DEF_REL_
+    BA_REL_
+    BA_DEF_DEF_REL_
+    BU_SG_REL_
+    BU_EV_REL_
+    BU_BO_REL_
+    SG_MUL_VAL_
+
+BS_:
+
+BU_: {bu}
+
 {val_table}
-\r
-\r
-{bo}\r
-\r
-{bo_tx_bu}\r
-\r
-\r
-{cm}\r
-{ba_def}\r
-{ba_def_def}\r
-{ba}\r
-{val}\r
-{signal_types}\r
-{sig_group}\r
-{sig_mux_values}\r
+
+
+{bo}
+
+{bo_tx_bu}
+
+
+{cm}
+{ba_def}
+{ba_def_def}
+{ba}
+{val}
+{signal_types}
+{sig_group}
+{sig_mux_values}
 """
 
 
@@ -355,9 +355,7 @@ class DbcSpecifics(object):
 
     @property
     def attributes(self):
-        """
-        The DBC specific attributes of the parent object (database, node, message or signal) as a dictionary.
-        """
+        """The DBC specific attributes of the parent object (database, node, message or signal) as a dictionary."""
         return self._attributes
 
     @attributes.setter
@@ -376,7 +374,6 @@ class DbcSpecifics(object):
 
         Only valid for DBC specifiers on database level.
         """
-
         return self._value_tables
 
     @property
@@ -386,7 +383,6 @@ class DbcSpecifics(object):
 
         Only valid for DBC specifiers on database level.
         """
-
         return self._environment_variables
 
 
@@ -415,15 +411,6 @@ class LongNamesConverter(object):
                 self._short_names.add(short_name)
 
         return short_name
-
-
-def get_dbc_frame_id(message):
-    frame_id = message.frame_id
-
-    if message.is_extended_frame:
-        frame_id |= 0x80000000
-
-    return frame_id
 
 
 def _get_node_name(attributes, name):
@@ -480,62 +467,61 @@ def _dump_value_tables(database):
 
 
 def _dump_messages(database):
-    bo = []
-
-    def format_mux(signl):
-        if signl.is_multiplexer:
-            return ' M'
-        elif signl.multiplexer_ids is not None:
-            return ' m{}'.format(signl.multiplexer_ids[0])
-        else:
-            return ''
-
-    def format_receivers(signl):
-        if signl.receivers:
-            return ' ' + ','.join(signl.receivers)
-        else:
-            return 'Vector__XXX'
-
-    def format_senders(messg):
-        if messg.senders:
-            return messg.senders[0]
-        else:
-            return 'Vector__XXX'
-
-    for message in database.messages:
-        msg = [
-            'BO_ {frame_id} {name}: {length} {senders}'.format(
-                frame_id=get_dbc_frame_id(message),
-                name=message.name,
-                length=message.length,
-                senders=format_senders(message)
-            )
-        ]
-
-        for signal in message.signals[::-1]:
-            fmt = (
-                ' SG_ {name}{mux} : {start}|{length}@{byte_order}{sign}'
-                ' ({scale},{offset})'
-                ' [{minimum}|{maximum}] "{unit}" {receivers}'
-            )
-            msg.append(fmt.format(
-                name=signal.name,
-                mux=format_mux(signal),
-                start=signal.start,
-                length=signal.length,
-                receivers=format_receivers(signal),
-                byte_order=(0 if signal.byte_order == 'big_endian' else 1),
-                sign=('-' if signal.is_signed else '+'),
-                scale=signal.scale,
-                offset=signal.offset,
-                minimum=(0 if signal.minimum is None else signal.minimum),
-                maximum=(0 if signal.maximum is None else signal.maximum),
-                unit='' if signal.unit is None else signal.unit
-            ))
-
-        bo.append('\r\n'.join(msg))
-
-    return bo
+    # bo = []
+    #
+    # def format_mux(signl):
+    #     if signl.is_multiplexer:
+    #         return ' M'
+    #     elif signl.multiplexer_ids is not None:
+    #         return ' m{}'.format(signl.multiplexer_ids[0])
+    #     else:
+    #         return ''
+    #
+    # def format_receivers(signl):
+    #     if signl.receivers:
+    #         return ' ' + ','.join(node.name for node in signl.receivers)
+    #     else:
+    #         return 'Vector__XXX'
+    #
+    # def format_senders(messg):
+    #     if messg.senders:
+    #         return messg.senders[0].name
+    #     else:
+    #         return 'Vector__XXX'
+    #
+    # for message in database.messages:
+    #     msg = [
+    #         'BO_ {frame_id} {name}: {length} {senders}'.format(
+    #             frame_id=message.dbc_frame_id,
+    #             name=message.name,
+    #             length=message.length,
+    #             senders=format_senders(message)
+    #         )
+    #     ]
+    #
+    #     for signal in message.signals[::-1]:
+    #         fmt = (
+    #             ' SG_ {name}{mux} : {start}|{length}@{byte_order}{sign}'
+    #             ' ({scale},{offset})'
+    #             ' [{minimum}|{maximum}] "{unit}" {receivers}'
+    #         )
+    #         msg.append(fmt.format(
+    #             name=signal.name,
+    #             mux=format_mux(signal),
+    #             start=signal.start,
+    #             length=signal.length,
+    #             receivers=format_receivers(signal),
+    #             byte_order=(0 if signal.byte_order == 'big_endian' else 1),
+    #             sign=('-' if signal.is_signed else '+'),
+    #             scale=signal.scale,
+    #             offset=signal.offset,
+    #             minimum=(0 if signal.minimum is None else signal.minimum),
+    #             maximum=(0 if signal.maximum is None else signal.maximum),
+    #             unit='' if signal.unit is None else signal.unit
+    #         ))
+    #
+    #     bo.append('\n'.join(msg))
+    return [str(message) for message in database.messages]
 
 
 def _dump_senders(database):
@@ -545,7 +531,7 @@ def _dump_senders(database):
         if len(message.senders) > 1:
             bo_tx_bu.append(
                 'BO_TX_BU_ {frame_id} : {senders};'.format(
-                    frame_id=get_dbc_frame_id(message),
+                    frame_id=message.dbc_frame_id,
                     senders=','.join(message.senders)
                 )
             )
@@ -554,33 +540,28 @@ def _dump_senders(database):
 
 
 def _dump_comments(database):
-    cm = []
+    cm = [
+        bus.comment.format()
+        for bus in database.buses
+        if bus.comment is not None
+    ]
+    cm += [
+        node.comment.format()
+        for node in database.nodes
+        if node.comment is not None
+    ]
+    cm += [
+        message.comment.format()
+        for message in database.messages
+        if message.comment is not None
+    ]
 
-    for bus in database.buses:
-        if bus.comment is not None:
-            cm.append('CM_ "{comment}";'.format(comment=bus.comment))
-
-    for node in database.nodes:
-        if node.comment is not None:
-            cm.append('CM_ BU_ {name} "{comment}";'.format(
-                name=node.name,
-                comment=node.comment.replace('"', '\\"')
-            ))
-
-    for message in database.messages:
-        if message.comment is not None:
-            cm.append('CM_ BO_ {frame_id} "{comment}";'.format(
-                frame_id=get_dbc_frame_id(message),
-                comment=message.comment.replace('"', '\\"')
-            ))
-
-        for signal in message.signals[::-1]:
-            if signal.comment is not None:
-                cm.append('CM_ SG_ {frame_id} {name} "{comment}";'.format(
-                    frame_id=get_dbc_frame_id(message),
-                    name=signal.name,
-                    comment=signal.comment.replace('"', '\\"')
-                ))
+    cm += [
+        signal.comment.format()
+        for message in database.messages
+        for signal in message.signals[::-1]
+        if signal.comment is not None
+    ]
 
     return cm
 
@@ -594,7 +575,7 @@ def _dump_signal_types(database):
                 continue
 
             valtype.append('SIG_VALTYPE_ {} {} : {};'.format(
-                get_dbc_frame_id(message),
+                message.dbc_frame_id,
                 signal.name,
                 FLOAT_LENGTH_TO_SIGNAL_TYPE[signal.length]
             ))
@@ -706,14 +687,6 @@ def _dump_attributes(database):
             for attribute in database.dbc.attributes.values()
             if attribute.value != attribute.definition.default_value
         ]
-        # for attribute in database.dbc.attributes.values():
-        #     if attribute.value == attribute.definition.default_value:
-        #         continue
-        #
-        #     ba.append('BA_ "{name}" {value};'.format(
-        #         name=attribute.definition.name,
-        #         value=get_value(attribute)
-        #     ))
 
     ba += [
         'BA_ "{name}" {kind} {node_name} {value};'.format(
@@ -728,19 +701,6 @@ def _dump_attributes(database):
         and node.dbc.attributes is not None
         and attribute.value != attribute.definition.default_value
     ]
-    # for node in database.nodes:
-    #     if node.dbc is not None:
-    #         if node.dbc.attributes is not None:
-    #             for attribute in node.dbc.attributes.values():
-    #                 if attribute.value == attribute.definition.default_value:
-    #                     continue
-    #
-    #                 ba.append('BA_ "{name}" {kind} {node_name} {value};'.format(
-    #                     name=attribute.definition.name,
-    #                     kind=attribute.definition.kind,
-    #                     node_name=node.name,
-    #                     value=get_value(attribute)
-    #                 ))
 
     for message in database.messages:
         if message.dbc is not None and message.dbc.attributes is not None:
@@ -748,33 +708,18 @@ def _dump_attributes(database):
                 'BA_ "{name}" {kind} {frame_id} {value};'.format(
                     name=attribute.definition.name,
                     kind=attribute.definition.kind,
-                    frame_id=get_dbc_frame_id(message),
+                    frame_id=message.dbc_frame_id,
                     value=get_value(attribute)
                 )
                 for attribute in message.dbc.attributes.values()
                 if attribute.value != attribute.definition.default_value
             ]
 
-        # for message in database.messages:
-        #     if message.dbc is not None:
-        #         if message.dbc.attributes is not None:
-        #             for attribute in message.dbc.attributes.values():
-        #                 if attribute.value == attribute.definition.default_value:
-        #                     continue
-        #
-        #                 ba.append(
-        #                     'BA_ "{name}" {kind} {frame_id} {value};'.format(
-        #                         name=attribute.definition.name,
-        #                         kind=attribute.definition.kind,
-        #                         frame_id=get_dbc_frame_id(message),
-        #                         value=get_value(attribute))
-        #                 )
-
         ba += [
             'BA_ "{name}" {kind} {frame_id} {signal_name} {value};'.format(
                 name=attribute.definition.name,
                 kind=attribute.definition.kind,
-                frame_id=get_dbc_frame_id(message),
+                frame_id=message.dbc_frame_id,
                 signal_name=signal.name,
                 value=get_value(attribute)
             )
@@ -784,20 +729,6 @@ def _dump_attributes(database):
             and signal.dbc.attributes is not None
             and attribute.value != attribute.definition.default_value
         ]
-        # for signal in message.signals[::-1]:
-        #     if signal.dbc is not None:
-        #         if signal.dbc.attributes is not None:
-        #             for attribute in signal.dbc.attributes.values():
-        #                 if attribute.value == attribute.definition.default_value:
-        #                     continue
-        #
-        #                 ba.append(
-        #                     'BA_ "{name}" {kind} {frame_id} {signal_name} {value};'.format(
-        #                         name=attribute.definition.name,
-        #                         kind=attribute.definition.kind,
-        #                         frame_id=get_dbc_frame_id(message),
-        #                         signal_name=signal.name,
-        #                         value=get_value(attribute)))
 
     return ba
 
@@ -805,7 +736,7 @@ def _dump_attributes(database):
 def _dump_choices(database):
     val = [
         'VAL_ {frame_id} {name} {choices} ;'.format(
-            frame_id=get_dbc_frame_id(message),
+            frame_id=message.dbc_frame_id,
             name=signal.name,
             choices=' '.join(
                 '{value} "{text}"'.format(value=value, text=text)
@@ -817,50 +748,21 @@ def _dump_choices(database):
         if signal.choices is not None
     ]
 
-    # for message in database.messages:
-    #     for signal in message.signals[::-1]:
-    #         if signal.choices is None:
-    #             continue
-    #
-    #         val.append(
-    #             'VAL_ {frame_id} {name} {choices} ;'.format(
-    #                 frame_id=get_dbc_frame_id(message),
-    #                 name=signal.name,
-    #                 choices=' '.join(['{value} "{text}"'.format(value=value,
-    #                                                             text=text)
-    #                                   for value, text in signal.choices.items()])))
-
     return val
 
 
 def _dump_signal_groups(database):
-    sig_group = []
-
-    for message in database.messages:
-        if message.signal_groups is None:
-            continue
-
-        for signal_group in message.signal_groups:
-            all_sig_names = list(map(lambda sig: sig.name, message.signals))
-            signal_group.signal_names = list(filter(
-                lambda sig_name: sig_name in all_sig_names, signal_group.signal_names
-            ))
-
-            sig_group.append(
-                'SIG_GROUP_ {frame_id} {signal_group_name} {repetitions} : {signal_names};'.format(
-                    frame_id=get_dbc_frame_id(message),
-                    signal_group_name=signal_group.name,
-                    repetitions=signal_group.repetitions,
-                    signal_names=' '.join(signal_group.signal_names)
-                )
-            )
-
+    sig_group = [
+        str(signal_group)
+        for message in database.messages
+        for signal_group in message.signal_groups
+        if message.signal_groups is not None
+    ]
     return sig_group
 
 
 def _is_extended_mux_needed(messages):
     """Check for messages with more than one mux signal or signals with more than one multiplexer value."""
-
     for message in messages:
         multiplexers = [
             signal.name
@@ -880,14 +782,13 @@ def _is_extended_mux_needed(messages):
 
 
 def _create_mux_ranges(multiplexer_ids):
-    """Create a list of ranges based on a list of single values.
+    """
+    Create a list of ranges based on a list of single values.
 
     Example:
         Input:  [1, 2, 3, 5,      7, 8, 9]
         Output: [[1, 3], [5, 5], [7, 9]]
-
     """
-
     ordered = sorted(multiplexer_ids)
     # Anything but ordered[0] - 1
     prev_value = ordered[0]
@@ -905,17 +806,13 @@ def _create_mux_ranges(multiplexer_ids):
 
 
 def _dump_signal_mux_values(database):
-    """Create multiplex entries ("SG_MUL_VAL_") if extended multiplexing
-    is used.
-
-    """
-
+    """Create multiplex entries ("SG_MUL_VAL_") if extended multiplexing is used."""
     if not _is_extended_mux_needed(database.messages):
         return []
 
     sig_mux_values = [
         'SG_MUL_VAL_ {frame_id} {name} {multiplexer} {ranges};'.format(
-            frame_id=get_dbc_frame_id(message),
+            frame_id=message.dbc_frame_id,
             name=signal.name,
             multiplexer=signal.multiplexer_signal,
             ranges=', '.join(
@@ -927,23 +824,6 @@ def _dump_signal_mux_values(database):
         for signal in message.signals
         if signal.multiplexer_ids
     ]
-
-    # for message in database.messages:
-    #     for signal in message.signals:
-    #         if not signal.multiplexer_ids:
-    #             continue
-    #
-    #         sig_mux_values.append(
-    #             'SG_MUL_VAL_ {frame_id} {name} {multiplexer} {ranges};'.format(
-    #                 frame_id=get_dbc_frame_id(message),
-    #                 name=signal.name,
-    #                 multiplexer=signal.multiplexer_signal,
-    #                 ranges=', '.join(
-    #                     '{}-{}'.format(minimum, maximum)
-    #                     for minimum, maximum in _create_mux_ranges(signal.multiplexer_ids)
-    #                 )
-    #             )
-    #         )
 
     return sig_mux_values
 
@@ -1140,10 +1020,7 @@ def _load_message_senders(tokens, attributes):
 
 
 def _load_signal_types(tokens):
-    """Load signal types.
-
-    """
-
+    """Load signal types."""
     signal_types = defaultdict(dict)
 
     for signal_type in tokens.get('SIG_VALTYPE_', []):
@@ -1155,10 +1032,7 @@ def _load_signal_types(tokens):
 
 
 def _load_signal_multiplexer_values(tokens):
-    """Load additional signal multiplexer values.
-
-    """
-
+    """Load additional signal multiplexer values."""
     signal_multiplexer_values = defaultdict(dict)
 
     for signal_multiplexer_value in tokens.get('SG_MUL_VAL_', []):
@@ -1185,7 +1059,6 @@ def _load_signal_multiplexer_values(tokens):
 
 def _load_signal_groups(tokens):
     """Load signal groups."""
-
     signal_groups = defaultdict(list)
 
     for signal_group in tokens.get('SIG_GROUP_', []):
@@ -1307,31 +1180,30 @@ def _load_signals(
 
     def get_minimum(minimum, maximum):
         if minimum == maximum == '0':
-            return None
+            return 0
         else:
             return num(minimum)
 
     def get_maximum(minimum, maximum):
         if minimum == maximum == '0':
-            return None
+            return 0
         else:
             return num(maximum)
 
     def get_minimum_decimal(minimum, maximum):
         if minimum == maximum == '0':
-            return None
+            return Decimal(0.0)
         else:
             return Decimal(minimum)
 
     def get_maximum_decimal(minimum, maximum):
         if minimum == maximum == '0':
-            return None
+            return Decimal(0.0)
         else:
             return Decimal(maximum)
 
     def get_is_float(frame_id_dbc_, signal_):
         """Get is_float for given signal."""
-
         try:
             return signal_types[frame_id_dbc_][signal_] in FLOAT_SIGNAL_TYPES
         except KeyError:
@@ -1377,7 +1249,7 @@ def _load_signals(
                 get_minimum_decimal(signal[15], signal[17]),
                 get_maximum_decimal(signal[15], signal[17])
             ),
-            unit=(None if signal[19] == '' else signal[19]),
+            unit=signal[19],
             choices=get_choices(frame_id_dbc, signal[1][0]),
             dbc_specifics=DbcSpecifics(get_attributes(frame_id_dbc, signal[1][0]), defs),
             comment=get_comment(frame_id_dbc, signal[1][0]),
@@ -1422,7 +1294,6 @@ def _load_messages(
 
     def get_comment(frame_id_dbc_):
         """Get comment for given message."""
-
         if frame_id_dbc_ in comments:
             return comments[frame_id_dbc_].get('message', None)
 
@@ -1442,7 +1313,7 @@ def _load_messages(
         return result
 
     def get_signal_groups(frame_id_dbc_):
-        return signal_groups.get(frame_id_dbc_, None)
+        return signal_groups.get(frame_id_dbc_, [])
 
     messages = []
 
@@ -1700,7 +1571,6 @@ def make_names_unique(database):
 
 def dump_string(database):
     """Format database in DBC file format."""
-
     # Make a deep copy of the database as names and attributes will be
     # modified for items with long names.
     database = deepcopy(database)
@@ -1722,17 +1592,17 @@ def dump_string(database):
     return DBC_FMT.format(
         version=_dump_version(database),
         bu=' '.join(bu),
-        val_table='\r\n'.join(val_table),
-        bo='\r\n\r\n'.join(bo),
-        bo_tx_bu='\r\n'.join(bo_tx_bu),
-        cm='\r\n'.join(cm),
-        signal_types='\r\n'.join(signal_types),
-        ba_def='\r\n'.join(ba_def),
-        ba_def_def='\r\n'.join(ba_def_def),
-        ba='\r\n'.join(ba),
-        val='\r\n'.join(val),
-        sig_group='\r\n'.join(sig_group),
-        sig_mux_values='\r\n'.join(sig_mux_values)
+        val_table='\n'.join(val_table),
+        bo='\n\n'.join(bo),
+        bo_tx_bu='\n'.join(bo_tx_bu),
+        cm='\n'.join(cm),
+        signal_types='\n'.join(signal_types),
+        ba_def='\n'.join(ba_def),
+        ba_def_def='\n'.join(ba_def_def),
+        ba='\n'.join(ba),
+        val='\n'.join(val),
+        sig_group='\n'.join(sig_group),
+        sig_mux_values='\n'.join(sig_mux_values)
     )
 
 
@@ -1795,7 +1665,6 @@ def get_definitions_dict(definitions, defaults):
 
 def load_string(database, string, strict=True):
     """Parse given string."""
-
     tokens = Parser().parse(string)
 
     comments = _load_comments(tokens)

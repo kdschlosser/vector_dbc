@@ -57,14 +57,33 @@ class SignalGroup(object):
         self._repetitions = value
 
     @property
-    def signal_names(self):
-        """The signal names in the signal group"""
-        return self._signal_names
-
-    @signal_names.setter
-    def signal_names(self, value):
-        self._signal_names = value
-
-    @property
     def signals(self):
-        return [signal for signal in self.message.signal if signal.name in self.signal_names]
+        """The signals in this group"""
+        return [signal for signal in self._parent.signals if signal.name in self._signal_names]
+
+    @signals.setter
+    def signals(self, value):
+        sig_names = []
+
+        for signal in value:
+            if signal.message != self._parent:
+                raise ValueError('signal must be mapped to the message of this signal group')
+
+            if signal.name not in sig_names:
+                sig_names += [signal.name]
+
+        self._signal_names = sig_names[:]
+
+    def __str__(self):
+        all_sig_names = list(map(lambda sig: sig.name, self._parent.signals))
+        self._signal_names = list(filter(
+            lambda sig_name: sig_name in all_sig_names, self._signal_names
+        ))
+
+        return 'SIG_GROUP_ {frame_id} {signal_group_name} {repetitions} : {signal_names};'.format(
+            frame_id=self._parent.dbc_frame_id,
+            signal_group_name=self.name,
+            repetitions=self.repetitions,
+            signal_names=' '.join(self._signal_names)
+        )
+

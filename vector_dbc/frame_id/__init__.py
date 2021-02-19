@@ -33,6 +33,16 @@ class FrameId(object):
     def __init__(self, frame_id):
         self._frame_id = frame_id
 
+    @property
+    def hex(self):
+        if self.frame_id > 0x7FF:
+            return '0x' + hex(self.frame_id)[2:].upper().zfill(8)
+        else:
+            return '0x' + hex(self.frame_id)[2:].upper().zfill(3)
+
+    def copy(self):
+        return FrameId(self._frame_id)
+
     @classmethod
     def from_frame_id(cls, frame_id):
         return cls(frame_id)

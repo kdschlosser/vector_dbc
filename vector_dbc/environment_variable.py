@@ -22,6 +22,7 @@
 
 from . import attribute
 from . import attribute_definition
+from .comment import EnvironmentVariableComment
 
 
 class EnvironmentVariable(attribute.AttributeMixin):
@@ -123,11 +124,27 @@ class EnvironmentVariable(attribute.AttributeMixin):
 
     @property
     def comment(self):
-        """The environment variable comment, or ``None`` if unavailable."""
+        """The node comment, or ``None`` if unavailable."""
+        if (
+            self._comment is not None and
+            not isinstance(self._comment, EnvironmentVariableComment)
+        ):
+            self._comment = EnvironmentVariableComment(self._comment)
+            self._comment.environment_variable = self
+
         return self._comment
 
     @comment.setter
     def comment(self, value):
+        if isinstance(value, bytes):
+            value = value.decode('utf-8')
+
+        if (
+            value is not None and
+            not isinstance(value, (str, EnvironmentVariableComment))
+        ):
+            value = str(value)
+
         self._comment = value
 
     @property

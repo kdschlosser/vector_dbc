@@ -23,6 +23,7 @@
 from . import attribute
 from . import attribute_definition
 from . import ecu
+from .comment import NodeComment
 from .frame_id import (
     J1939FrameId,
     GMParameterIdExtended
@@ -117,10 +118,17 @@ class Node(attribute.AttributeMixin):
     @property
     def comment(self):
         """The node comment, or ``None`` if unavailable."""
+        if self._comment is not None and not isinstance(self._comment, NodeComment):
+            self._comment = NodeComment(self._comment)
+            self._comment.node = self
+
         return self._comment
 
     @comment.setter
     def comment(self, value):
+        if value is not None and not isinstance(value, (str, NodeComment)):
+            value = str(value)
+
         self._comment = value
 
     @property

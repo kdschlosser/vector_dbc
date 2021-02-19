@@ -20,12 +20,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+
 class GMParameterIdExtended(object):
 
     def __init__(self, priority, parameter_id, source_id):
         self._priority = priority
         self._parameter_id = parameter_id
         self._source_id = source_id
+
+    @property
+    def hex(self):
+        return '0x' + hex(self.frame_id)[2:].upper().zfill(8)
+
+    def copy(self):
+        return GMParameterIdExtended(
+            self._priority,
+            self._parameter_id,
+            self._source_id,
+        )
 
     @property
     def priority(self):
@@ -95,6 +107,16 @@ class GMParameterId(object):
     def __init__(self, request_type, arbitration_id):
         self._request_type = request_type
         self._arbitration_id = arbitration_id
+
+    @property
+    def hex(self):
+        return '0x' + hex(self.frame_id)[2:].upper().zfill(3)
+
+    def copy(self):
+        return GMParameterId(
+            self._request_type,
+            self._arbitration_id
+        )
 
     @property
     def request_type(self):

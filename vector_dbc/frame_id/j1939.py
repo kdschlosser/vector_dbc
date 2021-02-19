@@ -42,6 +42,16 @@ class J1939FrameId(object):
         self._pdu_specific = pdu_specific
         self._source_address = source_address
 
+    def copy(self):
+        return J1939FrameId(
+            self._priority,
+            self._reserved,
+            self._data_page,
+            self._pdu_format,
+            self._pdu_specific,
+            self._source_address
+        )
+
     @classmethod
     def from_pgn(cls, pgn):
         try:
@@ -116,6 +126,10 @@ class J1939FrameId(object):
                 raise Error('Internal error.')
 
         return bitstruct.unpack('u29', packed)[0]
+
+    @property
+    def hex(self):
+        return '0x' + hex(self.frame_id)[2:].upper().zfill(8)
 
     @property
     def pgn(self):

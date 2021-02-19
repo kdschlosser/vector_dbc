@@ -30,6 +30,14 @@ class TXData(bytearray):
     _frame_id = None
 
     @property
+    def hex(self):
+        return ' '.join(hex(item)[2:].upper().zfill(2) for item in self)
+
+    @property
+    def frame_id_hex(self):
+        return self._frame_id.hex
+
+    @property
     def frame_id(self):
         return int(self._frame_id)
 
