@@ -25,6 +25,7 @@ from . import attribute_definition
 
 from .errors import EncodeError
 from .comment import SignalComment
+from . import sg_mul_val
 
 
 class Decimal(object):
@@ -137,6 +138,7 @@ class Signal(attribute.AttributeMixin):
         self._unit = unit
         self._choices = choices
         self._dbc = dbc_specifics
+        self._value = None
 
         # if the 'comment' argument is a string, we assume that is an
         # english comment. this is slightly hacky because the
@@ -151,12 +153,14 @@ class Signal(attribute.AttributeMixin):
             # multi-lingual dictionary
             self._comments = comment
 
+        if not multiplexer_ids:
+            multiplexer_ids = []
+
         self._receivers = [] if receivers is None else receivers
         self._is_multiplexer = is_multiplexer
-        self._multiplexer_ids = multiplexer_ids
-        self._multiplexer_signal = multiplexer_signal
         self._is_float = is_float
         self._parent = parent
+        self._multiplexer = sg_mul_val.SG_MUL_VAL(self, multiplexer_signal, multiplexer_ids)
 
     @property
     def message(self):
@@ -298,6 +302,16 @@ class Signal(attribute.AttributeMixin):
         self._dbc = value
 
     @property
+    def is_updated(self):
+        return self._value is not None
+
+    @property
+    def value(self):
+        val = self._value
+        self._value = None
+        return val
+
+    @property
     def comments(self):
         """The dictionary with the descriptions of the signal in multiple languages. ``None`` if unavailable."""
 
@@ -391,22 +405,9 @@ class Signal(attribute.AttributeMixin):
         self._is_multiplexer = value
 
     @property
-    def multiplexer_ids(self):
+    def multiplexer(self):
         """The multiplexer ids list if the signal is part of a multiplexed message, ``None`` otherwise."""
-        return self._multiplexer_ids
-
-    @multiplexer_ids.setter
-    def multiplexer_ids(self, value):
-        self._multiplexer_ids = value
-
-    @property
-    def multiplexer_signal(self):
-        """The multiplexer signal if the signal is part of a multiplexed message, ``None`` otherwise."""
-        return self._multiplexer_signal
-
-    @multiplexer_signal.setter
-    def multiplexer_signal(self, value):
-        self._multiplexer_signal = value
+        return self._multiplexer
 
     def choice_string_to_number(self, string):
         for choice_number, choice_string in self.choices.items():
@@ -437,9 +438,9 @@ class Signal(attribute.AttributeMixin):
         else:
             data = {self.name: data}
 
-        if self.multiplexer_signal is not None:
-            m_signal = self._parent.get_signal_by_name(self.multiplexer_signal)
-            data[self.multiplexer_signal] = m_signal.choices[self.multiplexer_ids[0]]
+        if self.multiplexer.is_ok:
+            m_signal = self.multiplexer.multiplexer_signal
+            data[m_signal.name] = m_signal.choices[self.multiplexer[0]]
 
         return self._parent.encode(data, scaling=scaling, padding=padding, strict=strict)
 
@@ -818,8 +819,8 @@ class Signal(attribute.AttributeMixin):
     def __str__(self):
         if self.is_multiplexer:
             mux = ' M'
-        elif self.multiplexer_ids is not None:
-            mux = ' m{}'.format(self.multiplexer_ids[0])
+        elif self.multiplexer.is_ok:
+            mux = ' m{}'.format(self.multiplexer[0])
         else:
             mux = ''
 
@@ -849,4 +850,3 @@ class Signal(attribute.AttributeMixin):
                 unit='' if self.unit is None else self.unit
         )
         return res
-

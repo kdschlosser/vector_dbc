@@ -50,6 +50,7 @@ from .node import Node
 from .bus import Bus
 from .internal_database import InternalDatabase
 from .environment_variable import EnvironmentVariable
+from .high_precision_timer import function_timer
 
 
 def num(number_as_string):
@@ -811,18 +812,10 @@ def _dump_signal_mux_values(database):
         return []
 
     sig_mux_values = [
-        'SG_MUL_VAL_ {frame_id} {name} {multiplexer} {ranges};'.format(
-            frame_id=message.dbc_frame_id,
-            name=signal.name,
-            multiplexer=signal.multiplexer_signal,
-            ranges=', '.join(
-                '{}-{}'.format(minimum, maximum)
-                for minimum, maximum in _create_mux_ranges(signal.multiplexer_ids)
-            )
-        )
+        str(signal.multiplexer)
         for message in database.messages
         for signal in message.signals
-        if signal.multiplexer_ids
+        if signal.multiplexer
     ]
 
     return sig_mux_values
@@ -1567,6 +1560,7 @@ def make_names_unique(database):
     make_signal_names_unique(database)
 
     return database
+
 
 
 def dump_string(database):

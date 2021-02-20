@@ -38,6 +38,8 @@ from . import attribute_definition
 from . import can_data
 from .comment import MessageComment
 
+from collections import defaultdict
+
 
 class Message(attribute.AttributeMixin):
     """
@@ -100,30 +102,20 @@ class Message(attribute.AttributeMixin):
 
     def _create_codec(self, parent_signal=None, multiplexer_id=None):
         """Create a codec of all signals with given parent signal. This is a recursive function."""
-        signals = []
-        multiplexers = {}
+        multiplexers = defaultdict(dict)
 
         # Find all signals matching given parent signal name and given
         # multiplexer id. Root signals' parent and multiplexer id are
         # both None.
-        for signal in self._signals:
-            if signal.multiplexer_signal != parent_signal:
-                continue
-
-            if (
-                multiplexer_id is not None and
-                multiplexer_id not in signal.multiplexer_ids
-            ):
-                continue
-
+        def _do1(signal):
             if signal.is_multiplexer:
-                children_ids = set()
-
-                for s in self._signals:
-                    if s.multiplexer_signal != signal.name:
-                        continue
-
-                    children_ids.update(s.multiplexer_ids)
+                children_ids = [
+                    item
+                    for s in self._signals
+                    for item in s.multiplexer
+                    if s.multiplexer.is_ok
+                    and s.multiplexer.multiplexer_signal.name != signal.name
+                ]
 
                 # Some CAN messages will have muxes containing only
                 # the multiplexer and no additional signals. At Tesla
@@ -132,17 +124,22 @@ class Message(attribute.AttributeMixin):
                 # multiplexer is included, even if it has no child
                 # signals.
                 if signal.choices:
-                    children_ids.update(signal.choices.keys())
+                    children_ids += list(signal.choices.keys())
 
-                for child_id in children_ids:
-                    codec = self._create_codec(signal.name, child_id)
+                multiplexers[signal.name].update(
+                    {child_id: self._create_codec(signal.name, child_id) for child_id in set(children_ids)}
+                )
 
-                    if signal.name not in multiplexers:
-                        multiplexers[signal.name] = {}
+            return signal
 
-                    multiplexers[signal.name][child_id] = codec
-
-            signals.append(signal)
+        signals = [
+            _do1(signal)
+            for signal in self._signals
+            if (
+                (signal.multiplexer.is_ok is False or signal.multiplexer.multiplexer_signal.name == parent_signal) and
+                (multiplexer_id is None or multiplexer_id in signal.multiplexer)
+            )
+        ]
 
         return {
             'signals': signals,
@@ -152,22 +149,17 @@ class Message(attribute.AttributeMixin):
 
     def _create_signal_tree(self, codec):
         """Create a multiplexing tree node of given codec. This is a recursive function."""
-        nodes = []
-
-        for signal in codec['signals']:
-            multiplexers = codec['multiplexers']
-
-            if signal.name in multiplexers:
-                node = {
-                    signal.name: {
-                        mux: self._create_signal_tree(mux_codec)
-                        for mux, mux_codec in multiplexers[signal.name].items()
-                    }
+        nodes = [
+            {
+                signal.name: {
+                    mux: self._create_signal_tree(mux_codec)
+                    for mux, mux_codec in  codec['multiplexers'][signal.name].items()
                 }
-            else:
-                node = signal.name
-
-            nodes.append(node)
+            }
+            if signal.name in codec['multiplexers']
+            else signal.name
+            for signal in codec['signals']
+        ]
 
         return nodes
 
@@ -324,11 +316,11 @@ class Message(attribute.AttributeMixin):
     @property
     def receivers(self):
         """A list of all receiver nodes attached to signals in this message"""
-        receivers = set()
-        for signal in self.signals:
-            for receiver in signal.receivers:
-                receivers.add(receiver)
-
+        receivers = set(
+            receiver.name
+            for signal in self.signals
+            for receiver in signal.receivers
+        )
         return [node for node in self.database.nodes if node.name in receivers]
 
     @property
@@ -445,8 +437,12 @@ class Message(attribute.AttributeMixin):
 
     def _decode(self, node, data, decode_choices, scaling):
         decoded = decode_data(
-            data, node['signals'], node['formats'],
-            decode_choices, scaling)
+            data,
+            node['signals'],
+            node['formats'],
+            decode_choices,
+            scaling
+        )
 
         multiplexers = node['multiplexers']
 
@@ -475,16 +471,22 @@ class Message(attribute.AttributeMixin):
         If `scaling` is ``False`` no scaling of signals is performed.
         """
         data = data[:self._length]
-        data = can_data.RXData(
-            self._decode(self._codecs, data, decode_choices, scaling)
-        )
-        data.frame_id = self.frame_id
-        return data
+        data = self._decode(self._codecs, data, decode_choices, scaling)
+
+        res = can_data.RXData()
+        res.frame_id = self.frame_id
+
+        for key, value in list(data.items())[:]:
+            signal = self.get_signal_by_name(key)
+            signal._value = value
+            res += [signal]
+
+        return res
 
     def get_signal_by_name(self, name):
-        for signal in self._signals:
-            if signal.name == name:
-                return signal
+        signal = [signal for signal in self.signals if signal.name == name]
+        if len(signal):
+            return signal[0]
 
         raise KeyError(name)
 
@@ -556,20 +558,26 @@ class Message(attribute.AttributeMixin):
                     message_bits[i] = child_bit
 
     def _check_signal_tree(self, message_bits, signal_tree):
-        for signal_name in signal_tree:
-            if isinstance(signal_name, dict):
-                self._check_mux(message_bits, signal_name)
-            else:
-                self._check_signal(
-                    message_bits, self.get_signal_by_name(signal_name))
+        [
+            self._check_mux(message_bits, signal_name)
+            if isinstance(signal_name, dict)
+            else self._check_signal(message_bits, self.get_signal_by_name(signal_name))
+            for signal_name in signal_tree
+        ]
 
     def _check_signal_lengths(self):
-        for signal in self._signals:
-            if signal.length <= 0:
-                raise Error(
-                    'The signal {} length {} is not greater '
-                    'than 0 in message {}.'.format(
-                        signal.name, signal.length, self.name))
+
+        errors = [
+            signal
+            for signal in self.signals
+            if signal.length <= 0
+        ]
+        if errors:
+            signal = errors[0]
+            raise Error(
+                'The signal {} length {} is not greater than 0 in '
+                'message {}.'.format(signal.name, signal.length, self.name)
+            )
 
     def refresh(self, strict=None):
         """
@@ -580,6 +588,13 @@ class Message(attribute.AttributeMixin):
         argument overrides the value of the same argument passed to
         the constructor.
         """
+
+        for signal in self._signals:
+            signal._parent = self
+
+        for signal_group in self._signal_groups:
+            signal_group._parent = self
+
         self._signals.sort(key=start_bit)
         self._check_signal_lengths()
         self._codecs = self._create_codec()
@@ -591,12 +606,6 @@ class Message(attribute.AttributeMixin):
         if strict:
             message_bits = 8 * self.length * [None]
             self._check_signal_tree(message_bits, self.signal_tree)
-
-        for signal in self._signals:
-            signal._parent = self
-
-        for signal_group in self._signal_groups:
-            signal_group._parent = self
 
     @property
     def gen_msg_delay_time(self):

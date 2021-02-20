@@ -1,4 +1,3 @@
-
 import vector_dbc
 
 db = vector_dbc.Database.load('OBDII.dbc')
@@ -34,7 +33,7 @@ print('=== Simulated Response Frame ===')
 print()
 rx = db.get_message('RX')
 data = dict(
-    mode='Show current data ',
+    mode='Live Data',
     response=2,
     length=3,
     VehicleSpeed=200,
@@ -46,8 +45,19 @@ encoded_data = rx.encode(data)
 print('encoded data:', encoded_data.frame_id_hex + ',', encoded_data.hex)
 
 decoded_data = db.decode_message(encoded_data.frame_id, encoded_data)
-print('decoded test frame:', decoded_data)
-print('decoded data same as test data:', data == decoded_data)
+response = {}
+for signal in decoded_data:
+    value = signal.value
+    response[signal.name] = value
+    if signal.name in ('mode', 'response', 'length', 'pid'):
+        continue
+
+    print()
+    print(signal.name + ':', value, signal.unit)
+
+print()
+print('decoded test frame:', response)
+print('decoded data same as test data:', data == response)
 print()
 print('=== End Simulated Response Frame ===')
 print()

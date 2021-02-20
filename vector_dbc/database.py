@@ -87,10 +87,39 @@ class Database(attribute.AttributeMixin):
         """
         return self._messages
 
+    @messages.setter
+    def messages(self, value):
+        for message in value:
+            res = self._add_message(message)
+            if res is True:
+                self._messages += [message]
+            else:
+                self._messages.remove(res)
+                self._messages += [message]
+
+            message._parent = self
+            message.refresh(self._strict)
+
     @property
     def nodes(self):
         """A list of nodes in the database."""
         return self._nodes
+
+    @nodes.setter
+    def nodes(self, value):
+        node_names = {node.name: node for node in self._nodes}
+
+        for node in value:
+            if node.name in node_names:
+                LOGGER.warning(
+                    "Overwriting node '%s'",
+                    node.name
+                )
+
+                index = self._nodes.index(node_names[node.name])
+                self._nodes[index] = node
+            else:
+                self._nodes += [node]
 
     @property
     def buses(self):
@@ -149,12 +178,16 @@ class Database(attribute.AttributeMixin):
 
     def _add_message(self, message):
         """Add given message to the database."""
+        res = True
+
         if message.name in self._name_to_message:
             LOGGER.warning(
                 "Overwriting message '%s' with '%s' in the "
                 "name to message dictionary.",
                 self._name_to_message[message.name].name,
                 message.name)
+
+            res = self._name_to_message[message.name]
 
         masked_frame_id = (message.frame_id.frame_id & self._frame_id_mask)
 
@@ -166,8 +199,11 @@ class Database(attribute.AttributeMixin):
                 message.name,
                 masked_frame_id)
 
+            res = self._frame_id_to_message[masked_frame_id]
+
         self._name_to_message[message.name] = message
         self._frame_id_to_message[masked_frame_id] = message
+        return res
 
     def as_string(self):
         """Return the database as a string formatted as a DBC file."""
@@ -218,9 +254,10 @@ class Database(attribute.AttributeMixin):
 
     def get_bus(self, name):
         """Find the bus object for given name `name`."""
-        for bus in self._buses:
-            if bus.name == name:
-                return bus
+
+        bus = [bus for bus in self._buses if bus.name == name]
+        if len(bus) > 0:
+            return bus[0]
 
         raise KeyError(name)
 

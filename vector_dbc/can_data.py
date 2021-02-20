@@ -42,8 +42,8 @@ class TXData(bytearray):
         return int(self._frame_id)
 
     @frame_id.setter
-    def frame_id(self, frame_id):
-        self._frame_id = frame_id
+    def frame_id(self, value):
+        self._frame_id = value
 
     def set_sending_node(self, node):
         tp_tx_indentfier = node.tp_tx_indentfier
@@ -56,7 +56,7 @@ class TXData(bytearray):
                 self._frame_id.source_id = tp_tx_indentfier
 
 
-class RXData(dict):
+class RXData(list):
     _frame_id = None
 
     @property
@@ -64,6 +64,40 @@ class RXData(dict):
         return int(self._frame_id)
 
     @frame_id.setter
-    def frame_id(self, frame_id):
-        self._frame_id = frame_id
+    def frame_id(self, value):
+        self._frame_id = value
 
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return list.__getitem__(self, item)
+
+        for signal in self:
+            if signal.name == item:
+                return signal
+
+        raise KeyError('"{0}" cannot be found.'.format(item))
+
+    def __setitem__(self, key, value):
+        if isinstance(key, int):
+            list.__setitem__(self, key, value)
+            return
+
+        for i, signal in enumerate(self):
+            if signal.name == key:
+                self[i] = value
+                return
+
+        self.append(value)
+
+    def __contains__(self, item):
+        if isinstance(item, bytes):
+            item = item.decode('utf-8')
+
+        if isinstance(item, str):
+            for signal in self:
+                if signal.name == item:
+                    return True
+
+            return False
+
+        return list.__contains__(self, item)
