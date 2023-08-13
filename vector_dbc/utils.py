@@ -69,11 +69,11 @@ def _encode_field(field, data, scaling):
     if isinstance(value, str):
         return field.choice_string_to_number(value)
     elif scaling:
-        if field.is_float:
-            return (value - field.offset) / field.scale
-        else:
-            value = (Decimal(value) - Decimal(field.offset)) / Decimal(field.scale)
+        value = (Decimal(value) - Decimal(field.offset)) / Decimal(field.scale)
 
+        if field.is_float:
+            return float(value)
+        else:
             return int(value.to_integral())
     else:
         return value
